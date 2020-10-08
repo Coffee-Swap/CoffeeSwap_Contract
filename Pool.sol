@@ -100,8 +100,9 @@ contract Pool {
     function claimAllReward () external{
         _updateReward(msg.sender);
         require(CUMULATED_REWARD[msg.sender] > 0, "Nothing to claim");
-        rewardToken.transfer(msg.sender, CUMULATED_REWARD[msg.sender]);
+        uint256 amount = CUMULATED_REWARD[msg.sender];
         CUMULATED_REWARD[msg.sender] = 0;
+        rewardToken.transfer(msg.sender, amount);
     }
 
     function stake (uint256 amount) external {
@@ -112,38 +113,15 @@ contract Pool {
         totalStaked = totalStaked.add(amount);
     }
 
-    function claimAndStake (uint256 amount) external {
-        _registAddress(msg.sender);
+    function claimAndUnstake (uint256 amount) external {
         _updateReward(msg.sender);
         if(CUMULATED_REWARD[msg.sender] > 0){
-            rewardToken.transfer(msg.sender, CUMULATED_REWARD[msg.sender]);
+            uint256 rewards = CUMULATED_REWARD[msg.sender];
             CUMULATED_REWARD[msg.sender] = 0;
+            rewardToken.transfer(msg.sender, rewards);
         }
-        stakeToken.transferFrom(msg.sender, address(this), amount);
-        STAKED_AMOUNT[msg.sender] = STAKED_AMOUNT[msg.sender].add(amount);
-        totalStaked = totalStaked.add(amount);
-    }
-
-    function unstake (uint256 amount) external {
-        _updateReward(msg.sender);
-        require (amount <= STAKED_AMOUNT[msg.sender], "Unstake amount should be less than staked amount");
         _withdraw(msg.sender, amount);
     }
-    
-    function unstakeAll () external {
-        _updateReward(msg.sender);
-        _withdraw(msg.sender, STAKED_AMOUNT[msg.sender]);
-    }
-
-    function claimAndUnstakeAll () external {
-        _updateReward(msg.sender);
-        if(CUMULATED_REWARD[msg.sender] > 0){
-            rewardToken.transfer(msg.sender, CUMULATED_REWARD[msg.sender]);
-            CUMULATED_REWARD[msg.sender] = 0;
-        }
-        _withdraw(msg.sender, STAKED_AMOUNT[msg.sender]);
-    }
-
 
     function inquiryDeposit (address host) external view returns (uint256) {
         return STAKED_AMOUNT[host];
@@ -167,9 +145,10 @@ contract Pool {
     }
 
     function _withdraw (address host, uint256 amount) internal {
-        stakeToken.transfer(host, amount);
         STAKED_AMOUNT[host] = STAKED_AMOUNT[host].sub(amount);
+        require(STAKED_AMOUNT[host] >= 0);
         totalStaked = totalStaked.sub(amount);
+        stakeToken.transfer(host, amount);
     }
 
     function _updateAllReward () internal {
